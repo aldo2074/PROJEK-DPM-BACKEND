@@ -12,7 +12,9 @@ exports.getProfile = async (req, res) => {
             });
         }
 
-        const user = await User.findById(req.user.userId).select('-password');
+        const user = await User.findById(req.user.userId)
+            .select('-password')
+            .lean();
         console.log('Found User:', user);
 
         if (!user) {
@@ -20,6 +22,11 @@ exports.getProfile = async (req, res) => {
                 success: false,
                 message: 'User tidak ditemukan'
             });
+        }
+
+        // Transform profileImage path jika ada
+        if (user.profileImage) {
+            user.profileImage = user.profileImage.replace(/\\/g, '/');
         }
 
         res.json({
@@ -56,7 +63,7 @@ exports.updateProfile = async (req, res) => {
 
         // Handle profile image
         if (req.file) {
-            updates.profileImage = req.file.path;
+            updates.profileImage = req.file.path.replace(/\\/g, '/');
         }
 
         const user = await User.findByIdAndUpdate(

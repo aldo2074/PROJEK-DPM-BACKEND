@@ -54,13 +54,14 @@ const AuthController = {
 
             await user.save();
 
-            // Generate token menggunakan JWT_SECRET dari .env
+            // Buat token
             const token = generateToken(user._id);
 
+            // Kirim response dengan token
             res.status(201).json({
                 success: true,
-                message: "Registrasi berhasil",
-                token,
+                message: 'Registrasi berhasil',
+                token: token,
                 user: {
                     id: user._id,
                     username: user.username,
@@ -68,10 +69,10 @@ const AuthController = {
                 }
             });
         } catch (error) {
-            console.error('Register error:', error);
+            console.error('Registration error:', error);
             res.status(500).json({
                 success: false,
-                message: "Terjadi kesalahan pada server"
+                message: error.message || 'Terjadi kesalahan saat registrasi'
             });
         }
     },
