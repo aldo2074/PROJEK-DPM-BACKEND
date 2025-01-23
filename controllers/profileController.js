@@ -91,4 +91,66 @@ exports.updateProfile = async (req, res) => {
             message: 'Terjadi kesalahan saat memperbarui profil'
         });
     }
+};
+
+exports.changePassword = async (req, res) => {
+    try {
+        console.log('Change Password Controller:', {
+            userId: req.user?.userId,
+            body: req.body
+        });
+
+        if (!req.user || !req.user.userId) {
+            return res.status(401).json({
+                success: false,
+                message: 'User tidak terautentikasi'
+            });
+        }
+
+        const { currentPassword, newPassword } = req.body;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password saat ini dan password baru harus diisi'
+            });
+        }
+
+        const user = await User.findById(req.user.userId);
+        
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User tidak ditemukan'
+            });
+        }
+
+        // Verifikasi password saat ini
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password saat ini tidak sesuai'
+            });
+        }
+
+        // Hash password baru
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+        
+        // Update password
+        user.password = hashedPassword;
+        await user.save();
+
+        res.json({
+            success: true,
+            message: 'Password berhasil diubah'
+        });
+    } catch (error) {
+        console.error('Error in changePassword:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Terjadi kesalahan saat mengubah password'
+        });
+    }
 }; 

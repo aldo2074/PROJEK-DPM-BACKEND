@@ -16,15 +16,16 @@ const CartController = {
                 });
             }
 
-            // Hitung total keseluruhan
-            const totalAmount = cart.items.reduce((sum, item) => 
-                sum + item.totalPrice, 0
-            );
+            // Pastikan setiap item memiliki _id yang valid
+            const items = cart.items.map(item => ({
+                ...item.toObject(),
+                _id: item._id.toString()
+            }));
 
             res.json({
                 success: true,
-                items: cart.items,
-                totalAmount,
+                items: items,
+                totalAmount: items.reduce((sum, item) => sum + item.totalPrice, 0),
                 message: 'Berhasil mengambil data keranjang'
             });
         } catch (error) {

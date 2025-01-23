@@ -1,23 +1,40 @@
 const express = require('express');
 const router = express.Router();
-const authenticateUser = require('../middleware/authenticateUser');
 const profileController = require('../controllers/profileController');
-const upload = require('../middleware/upload');
+const auth = require('../middleware/auth');
+const multer = require('multer');
 
-// Tambahkan middleware untuk logging
-router.use((req, res, next) => {
-    console.log('Profile Route Headers:', req.headers);
-    next();
+// Configure multer for handling file uploads
+const storage = multer.diskStorage({
+    destination: function(req, file, cb) {
+        cb(null, 'uploads/profiles/');
+    },
+    filename: function(req, file, cb) {
+        cb(null, Date.now() + '-' + file.originalname);
+    }
 });
 
-// Get profile
-router.get('/', authenticateUser, profileController.getProfile);
+const upload = multer({ 
+    storage: storage,
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Not an image! Please upload an image.'), false);
+        }
+    }
+});
 
-// Update profile
-router.put('/', 
-  authenticateUser, 
-  upload.single('profileImage'), 
-  profileController.updateProfile
-);
+// Get user profile
+router.get('/', auth, profileController.getProfile);
 
-module.exports = router; 
+// Update profile (with optional image upload)
+router.put('/', auth, upload.single('profileImage'), profileController.updateProfile);
+
+// Change password
+router.put('/change-password', auth, profileController.changePassword);
+
+module.exports = router;
