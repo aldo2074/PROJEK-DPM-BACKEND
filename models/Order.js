@@ -4,17 +4,20 @@ const OrderSchema = new mongoose.Schema({
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true
+      required: true,
+      index: true
     },
     orderNumber: {
       type: String,
       required: true,
-      unique: true
+      unique: true,
+      index: true
     },
     items: [{
       service: {
         type: String,
-        required: true
+        required: true,
+        enum: ['Cuci Setrika', 'Setrika', 'Cuci Kering']
       },
       items: [{
         name: {
@@ -23,21 +26,35 @@ const OrderSchema = new mongoose.Schema({
         },
         quantity: {
           type: Number,
-          required: true
+          required: true,
+          min: 1
         },
         price: {
           type: Number,
-          required: true
+          required: true,
+          min: 0
         }
       }],
       totalPrice: {
         type: Number,
-        required: true
+        required: true,
+        min: 0
       }
     }],
     totalAmount: {
       type: Number,
-      required: true
+      required: true,
+      min: 0
+    },
+    deliveryFee: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    subtotal: {
+      type: Number,
+      required: true,
+      min: 0
     },
     status: {
       type: String,
@@ -47,9 +64,7 @@ const OrderSchema = new mongoose.Schema({
     },
     deliveryAddress: {
       type: String,
-      required: function() {
-        return this.deliveryMethod === 'pickup';
-      }
+      default: ''
     },
     deliveryMethod: {
       type: String,
@@ -61,16 +76,24 @@ const OrderSchema = new mongoose.Schema({
       required: true,
       enum: ['cash', 'dana']
     },
-    notes: String,
+    notes: {
+      type: String,
+      default: ''
+    },
     estimatedDoneDate: {
       type: Date,
       required: true
     },
     createdAt: {
       type: Date,
-      default: Date.now
+      default: Date.now,
+      index: true
     }
   });
+
+  // Add indexes for common queries
+  OrderSchema.index({ userId: 1, createdAt: -1 });
+  OrderSchema.index({ orderNumber: 1 }, { unique: true });
 
   module.exports = mongoose.model('Order', OrderSchema);
 

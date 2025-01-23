@@ -16,9 +16,9 @@ const userSchema = new mongoose.Schema({
         required: true,
     },
     profileImage: {
-        data: Buffer,      // Data biner gambar
-        contentType: String, // Tipe MIME gambar (e.g., image/jpeg, image/png)
+        type: String,
+        default: null
     },
-});
+}, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

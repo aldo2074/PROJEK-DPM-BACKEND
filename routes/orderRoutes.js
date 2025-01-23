@@ -3,6 +3,7 @@ const router = express.Router();
 const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const authenticateUser = require('../middleware/authenticateUser');
+const OrderController = require('../controllers/orderController');
 
 // Generate unique order number
 const generateOrderNumber = () => {
@@ -11,100 +12,87 @@ const generateOrderNumber = () => {
   return `ORD${timestamp}${random}`;
 };
 
-// Create new order from cart
-router.post('/create', authenticateUser, async (req, res) => {
-  try {
-    const { deliveryMethod, deliveryAddress, paymentMethod, notes } = req.body;
+// Middleware untuk validasi token
+const validateToken = async (req, res, next) => {
+    try {
+        if (!req.user || !req.user.exp) {
+            return res.status(401).json({
+                success: false,
+                error: 'Token tidak valid',
+                isExpired: true
+            });
+        }
 
-    // Get user's cart
-    const cart = await Cart.findOne({ userId: req.user.id });
-    if (!cart || cart.items.length === 0) {
-      return res.status(400).json({ error: 'Keranjang kosong' });
+        const currentTimestamp = Math.floor(Date.now() / 1000);
+        if (currentTimestamp >= req.user.exp) {
+            return res.status(401).json({
+                success: false,
+                error: 'Sesi anda telah berakhir',
+                isExpired: true
+            });
+        }
+        next();
+    } catch (error) {
+        return res.status(401).json({
+            success: false,
+            error: 'Token tidak valid',
+            isExpired: true
+        });
     }
+};
 
-    // Calculate estimated done date (3 days from now)
-    const estimatedDoneDate = new Date();
-    estimatedDoneDate.setDate(estimatedDoneDate.getDate() + 3);
+// Apply authentication and token validation middleware
+router.use(authenticateUser);
+router.use(validateToken);
 
-    // Create new order
-    const order = new Order({
-      userId: req.user.id,
-      orderNumber: generateOrderNumber(),
-      items: cart.items,
-      totalAmount: cart.totalAmount,
-      deliveryMethod,
-      deliveryAddress,
-      paymentMethod,
-      notes,
-      estimatedDoneDate
-    });
-
-    await order.save();
-
-    // Clear cart after order is created
-    await Cart.findOneAndDelete({ userId: req.user.id });
-
-    res.status(201).json(order);
-  } catch (error) {
-    console.error('Error creating order:', error);
-    res.status(500).json({ error: 'Gagal membuat pesanan' });
-  }
-});
+// Create new order
+router.post('/create', OrderController.createOrder);
 
 // Get user's orders
-router.get('/', authenticateUser, async (req, res) => {
-  try {
-    const orders = await Order.find({ userId: req.user.id })
-      .sort({ createdAt: -1 });
-    res.json(orders);
-  } catch (error) {
-    console.error('Error fetching orders:', error);
-    res.status(500).json({ error: 'Gagal mengambil data pesanan' });
-  }
-});
+router.get('/', OrderController.getOrders);
 
 // Get order details
-router.get('/:orderId', authenticateUser, async (req, res) => {
-  try {
-    const order = await Order.findOne({
-      _id: req.params.orderId,
-      userId: req.user.id
-    });
-    
-    if (!order) {
-      return res.status(404).json({ error: 'Pesanan tidak ditemukan' });
-    }
-    
-    res.json(order);
-  } catch (error) {
-    console.error('Error fetching order details:', error);
-    res.status(500).json({ error: 'Gagal mengambil detail pesanan' });
-  }
-});
+router.get('/:orderId', OrderController.getOrderById);
 
 // Cancel order
-router.put('/:orderId/cancel', authenticateUser, async (req, res) => {
+router.put('/:orderId/cancel', async (req, res) => {
   try {
+    const userId = req.user.userId;
+    const { orderId } = req.params;
+
     const order = await Order.findOne({
-      _id: req.params.orderId,
-      userId: req.user.id
+      _id: orderId,
+      userId
     });
     
     if (!order) {
-      return res.status(404).json({ error: 'Pesanan tidak ditemukan' });
+      return res.status(404).json({
+        success: false,
+        error: 'Pesanan tidak ditemukan'
+      });
     }
 
     if (order.status !== 'Dalam Proses') {
-      return res.status(400).json({ error: 'Pesanan tidak dapat dibatalkan' });
+      return res.status(400).json({
+        success: false,
+        error: 'Pesanan tidak dapat dibatalkan'
+      });
     }
 
     order.status = 'Dibatalkan';
     await order.save();
     
-    res.json(order);
+    res.json({
+      success: true,
+      message: 'Pesanan berhasil dibatalkan',
+      order
+    });
   } catch (error) {
     console.error('Error canceling order:', error);
-    res.status(500).json({ error: 'Gagal membatalkan pesanan' });
+    res.status(500).json({
+      success: false,
+      error: 'Gagal membatalkan pesanan'
+    });
   }
 });
 

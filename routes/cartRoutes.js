@@ -1,86 +1,46 @@
 const express = require('express');
 const router = express.Router();
-const Cart = require('../models/Cart');
+const CartController = require('../controllers/cartController');
 const authenticateUser = require('../middleware/authenticateUser');
 
-// Get cart items for user
-router.get('/', authenticateUser, async (req, res) => {
-  try {
-    const cart = await Cart.findOne({ userId: req.user.id });
-    res.json(cart || { items: [], totalAmount: 0 });
-  } catch (error) {
-    console.error('Error fetching cart:', error);
-    res.status(500).json({ error: 'Gagal mengambil data keranjang' });
-  }
-});
+// Apply authentication middleware to all cart routes
+router.use(authenticateUser);
+
+// Get cart items
+router.get('/', CartController.getCart);
 
 // Add item to cart
-router.post('/add', authenticateUser, async (req, res) => {
-  try {
-    const { service, items, totalPrice } = req.body;
-    
-    if (!service || !items || items.length === 0) {
-      return res.status(400).json({ error: 'Data tidak lengkap' });
-    }
+router.post('/', CartController.addItem);
 
-    let cart = await Cart.findOne({ userId: req.user.id });
+// Update service in cart
+router.put('/update/:serviceId', CartController.updateService);
 
-    if (!cart) {
-      cart = new Cart({
-        userId: req.user.id,
-        items: [],
-        totalAmount: 0
-      });
-    }
+// Update existing service in cart
+router.put('/service/:serviceId', CartController.updateService);
 
-    // Add new service items
-    cart.items.push({
-      service,
-      items,
-      totalPrice
-    });
+// Update quantity
+router.patch('/quantity', CartController.updateQuantity);
 
-    // Update total amount
-    cart.totalAmount = cart.items.reduce((sum, item) => sum + item.totalPrice, 0);
-    cart.updatedAt = Date.now();
-
-    await cart.save();
-    res.status(200).json(cart);
-  } catch (error) {
-    console.error('Error adding to cart:', error);
-    res.status(500).json({ error: 'Gagal menambahkan ke keranjang' });
-  }
-});
-
-// Remove item from cart
-router.delete('/remove/:serviceId', authenticateUser, async (req, res) => {
-  try {
-    const cart = await Cart.findOne({ userId: req.user.id });
-    if (!cart) {
-      return res.status(404).json({ error: 'Keranjang tidak ditemukan' });
-    }
-
-    cart.items = cart.items.filter(item => item._id.toString() !== req.params.serviceId);
-    cart.totalAmount = cart.items.reduce((sum, item) => sum + item.totalPrice, 0);
-    cart.updatedAt = Date.now();
-
-    await cart.save();
-    res.json(cart);
-  } catch (error) {
-    console.error('Error removing from cart:', error);
-    res.status(500).json({ error: 'Gagal menghapus dari keranjang' });
-  }
-});
+// Remove specific item
+router.delete('/remove/:serviceId', CartController.removeItem);
 
 // Clear cart
-router.delete('/clear', authenticateUser, async (req, res) => {
-  try {
-    await Cart.findOneAndDelete({ userId: req.user.id });
-    res.json({ message: 'Keranjang berhasil dikosongkan' });
-  } catch (error) {
-    console.error('Error clearing cart:', error);
-    res.status(500).json({ error: 'Gagal mengosongkan keranjang' });
-  }
+router.delete('/clear', CartController.clearCart);
+
+// Tambahkan logging untuk debugging
+router.use((req, res, next) => {
+    console.log('Requested URL:', req.method, req.originalUrl);
+    next();
+});
+
+// Error handling middleware
+router.use((err, req, res, next) => {
+    console.error('Cart route error:', err);
+    res.status(500).json({
+        success: false,
+        error: 'Terjadi kesalahan pada server',
+        details: err.message
+    });
 });
 
 module.exports = router; 
