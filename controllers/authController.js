@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const { generateToken } = require('../utils/jwt');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const AuthController = {
@@ -80,17 +81,11 @@ const AuthController = {
     login: async (req, res) => {
         try {
             const { email, password } = req.body;
+            console.log('Login attempt for:', email);
 
-            // Validasi input
-            if (!email || !password) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Email dan password harus diisi'
-                });
-            }
-
-            // Cari user
+            // Cari user berdasarkan email
             const user = await User.findOne({ email });
+            
             if (!user) {
                 return res.status(401).json({
                     success: false,
@@ -99,25 +94,36 @@ const AuthController = {
             }
 
             // Verifikasi password
-            const isMatch = await bcrypt.compare(password, user.password);
-            if (!isMatch) {
+            const isValidPassword = await bcrypt.compare(password, user.password);
+            if (!isValidPassword) {
                 return res.status(401).json({
                     success: false,
                     message: 'Email atau password salah'
                 });
             }
 
-            // Generate token
-            const token = generateToken(user._id);
+            // Generate token dengan role yang sesuai
+            const token = jwt.sign(
+                { 
+                    userId: user._id,
+                    email: user.email,
+                    role: user.role
+                },
+                process.env.JWT_SECRET,
+                { expiresIn: '24h' }
+            );
 
-            // Response dengan token
-            res.json({
+            // Response sukses
+            res.status(200).json({
                 success: true,
-                token,
-                user: {
-                    id: user._id,
-                    username: user.username,
-                    email: user.email
+                message: 'Login berhasil',
+                data: {
+                    token,
+                    user: {
+                        _id: user._id,
+                        email: user.email,
+                        role: user.role
+                    }
                 }
             });
 
@@ -125,7 +131,91 @@ const AuthController = {
             console.error('Login error:', error);
             res.status(500).json({
                 success: false,
-                message: 'Terjadi kesalahan saat login'
+                message: 'Terjadi kesalahan pada server'
+            });
+        }
+    },
+
+    registerAdmin: async (req, res) => {
+        try {
+            const { email, password, adminCode } = req.body;
+            console.log('Attempting admin registration:', { email });
+
+            // Validasi input
+            if (!email || !password || !adminCode) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Semua field harus diisi'
+                });
+            }
+
+            // Verifikasi kode admin
+            const ADMIN_SECRET_CODE = process.env.ADMIN_SECRET_CODE;
+            if (!ADMIN_SECRET_CODE || adminCode !== ADMIN_SECRET_CODE) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Kode admin tidak valid'
+                });
+            }
+
+            // Cek email sudah terdaftar
+            const existingUser = await User.findOne({ email });
+            if (existingUser) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Email sudah terdaftar'
+                });
+            }
+
+            // Generate username dari email (hapus karakter khusus)
+            const username = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
+            console.log('Generated username:', username);
+
+            // Hash password
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            // Buat user admin baru
+            const newAdmin = new User({
+                username,  // Pastikan username ada
+                email,
+                password: hashedPassword,
+                role: 'admin'  // Set role admin
+            });
+
+            console.log('Creating admin user with data:', {
+                username: newAdmin.username,
+                email: newAdmin.email,
+                role: newAdmin.role
+            });
+
+            await newAdmin.save();
+            console.log('Admin registered successfully');
+
+            res.status(201).json({
+                success: true,
+                message: 'Admin berhasil didaftarkan',
+                data: {
+                    username: newAdmin.username,
+                    email: newAdmin.email,
+                    role: newAdmin.role
+                }
+            });
+
+        } catch (error) {
+            console.error('Admin registration error:', error);
+            
+            if (error.name === 'ValidationError') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Data tidak valid',
+                    details: error.message
+                });
+            }
+
+            res.status(500).json({
+                success: false,
+                message: 'Terjadi kesalahan pada server',
+                details: error.message
             });
         }
     }

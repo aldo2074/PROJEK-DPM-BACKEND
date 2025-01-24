@@ -1,13 +1,22 @@
 const express = require('express');
 const router = express.Router();
-const AuthController = require('../controllers/authController');
+const { login, register, registerAdmin } = require('../controllers/authController');
 const authenticateUser = require('../middleware/authenticateUser');
 
-// Register
-router.post('/register', AuthController.register);
+// Debug middleware
+router.use((req, res, next) => {
+    console.log('Auth Route accessed:', {
+        method: req.method,
+        path: req.path,
+        body: req.body
+    });
+    next();
+});
 
-// Login
-router.post('/login', AuthController.login);
+// Public routes
+router.post('/login', login);
+router.post('/register', register);
+router.post('/register-admin', registerAdmin);
 
 // Protected routes
 router.get('/validate', authenticateUser, (req, res) => {
@@ -27,5 +36,7 @@ router.get('/validate', authenticateUser, (req, res) => {
         });
     }
 });
+
+router.post('/admin/login', login);  // Endpoint khusus admin
 
 module.exports = router;

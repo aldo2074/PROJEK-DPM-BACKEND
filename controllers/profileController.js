@@ -24,11 +24,6 @@ exports.getProfile = async (req, res) => {
             });
         }
 
-        // Transform profileImage path jika ada
-        if (user.profileImage) {
-            user.profileImage = user.profileImage.replace(/\\/g, '/');
-        }
-
         res.json({
             success: true,
             user: user
@@ -56,23 +51,14 @@ exports.updateProfile = async (req, res) => {
         // Handle text fields
         if (req.body.username) updates.username = req.body.username;
         if (req.body.email) updates.email = req.body.email;
-        if (req.body.newPassword) {
-            const salt = await bcrypt.genSalt(10);
-            updates.password = await bcrypt.hash(req.body.newPassword, salt);
-        }
 
-        // Handle profile image
-        if (req.file) {
-            updates.profileImage = req.file.path.replace(/\\/g, '/');
-        }
-
-        const user = await User.findByIdAndUpdate(
+        const updatedUser = await User.findByIdAndUpdate(
             req.user.userId,
             updates,
             { new: true, runValidators: true }
         ).select('-password');
 
-        if (!user) {
+        if (!updatedUser) {
             return res.status(404).json({
                 success: false,
                 message: 'User tidak ditemukan'
@@ -82,7 +68,7 @@ exports.updateProfile = async (req, res) => {
         res.json({
             success: true,
             message: 'Profil berhasil diperbarui',
-            user
+            user: updatedUser
         });
     } catch (error) {
         console.error('Error in updateProfile:', error);

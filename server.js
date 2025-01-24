@@ -8,6 +8,7 @@ const authRoutes = require('./routes/authRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 dotenv.config();
 
@@ -23,32 +24,23 @@ if (!fs.existsSync(uploadsDir)){
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
 }));
 app.use(express.json());
 
 // Connect to database
 connectDB();
 
-// Health check route
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok', message: 'Server is running' });
-});
-
-// Routes without /api prefix
+// Routes
 app.use('/auth', authRoutes);
 app.use('/profile', profileRoutes);
 app.use('/cart', cartRoutes);
 app.use('/orders', orderRoutes);
+app.use('/notifications', notificationRoutes);
 
 // Serve static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Debug middleware untuk logging requests
-app.use((req, res, next) => {
-    console.log(`${req.method} ${req.url}`);
-    next();
-});
 
 // Global error handling middleware
 app.use((err, req, res, next) => {
@@ -77,13 +69,11 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Handle 404 - Keep this as the last middleware
+// Handle 404
 app.use((req, res) => {
-    console.log('404 Route not found:', req.method, req.url);
     res.status(404).json({
         success: false,
-        error: 'Route tidak ditemukan',
-        path: req.originalUrl
+        error: 'Route tidak ditemukan'
     });
 });
 
@@ -93,9 +83,4 @@ const HOST = process.env.SERVER_HOST || 'localhost';
 
 app.listen(PORT, HOST, () => {
     console.log(`Server running on http://${HOST}:${PORT}`);
-    console.log('Available routes:');
-    console.log('- /auth/*');
-    console.log('- /profile/*');
-    console.log('- /cart/*');
-    console.log('- /orders/*');
 });

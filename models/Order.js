@@ -56,8 +56,8 @@ const orderSchema = new Schema({
     },
     status: {
         type: String,
-        enum: ['Dalam Proses', 'Selesai', 'Dibatalkan'],
-        default: 'Dalam Proses'
+        enum: ['pending', 'processing', 'completed', 'cancelled'],
+        default: 'pending'
     },
     estimatedDoneDate: {
         type: Date,
@@ -67,10 +67,30 @@ const orderSchema = new Schema({
         type: Date,
         default: Date.now
     }
-});
+}, { timestamps: true });
 
 // Add indexes for common queries
 orderSchema.index({ userId: 1, orderDate: -1 });
+
+// Tambahkan method untuk mendapatkan status dalam bahasa Indonesia
+orderSchema.methods.getStatusInIndonesian = function() {
+    const statusMap = {
+        'pending': 'Menunggu Konfirmasi',
+        'processing': 'Dalam Proses',
+        'completed': 'Selesai',
+        'cancelled': 'Dibatalkan'
+    };
+    return statusMap[this.status] || this.status;
+};
+
+// Tambahkan virtual field untuk status dalam bahasa Indonesia
+orderSchema.virtual('statusInIndonesian').get(function() {
+    return this.getStatusInIndonesian();
+});
+
+// Pastikan virtuals dimasukkan saat mengubah ke JSON
+orderSchema.set('toJSON', { virtuals: true });
+orderSchema.set('toObject', { virtuals: true });
 
 module.exports = mongoose.model('Order', orderSchema);
 
